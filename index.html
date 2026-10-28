@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>今天中午吃什麼？Places API (New)</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--text:#17202a;--muted:#667085;--brand:#0f766e;--line:#e5e7eb;--warn:#9a3412}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Noto Sans TC",sans-serif;color:var(--text);background:linear-gradient(135deg,#ecfdf5,#f8fafc 48%,#eff6ff)}
+.wrap{width:min(1080px,92%);margin:38px auto}h1{margin:0 0 8px;font-size:clamp(28px,5vw,44px)}.sub{margin:0 0 20px;color:var(--muted)}
+.panel,.restaurant{background:rgba(255,255,255,.96);border:1px solid var(--line);box-shadow:0 16px 45px rgba(15,23,42,.07)}.panel{padding:22px;border-radius:22px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.full{grid-column:1/-1}
+label{display:block;font-weight:750;margin-bottom:7px}input,select,button{width:100%;min-height:46px;border-radius:12px;font:inherit}input,select{padding:0 13px;border:1px solid var(--line);background:#fff}input:focus,select:focus{outline:3px solid #99f6e4;border-color:var(--brand)}
+.note{margin-top:14px;padding:12px;border-radius:12px;background:#ecfeff;color:#155e75;font-size:14px}.actions{display:flex;gap:10px;margin-top:18px}button{border:0;cursor:pointer;font-weight:800;padding:0 18px}.primary{background:var(--brand);color:#fff}.secondary{max-width:180px;background:#eef2f6;color:#344054}button:disabled{opacity:.55;cursor:not-allowed}#status{min-height:24px;margin:16px 0 0;color:var(--muted)}
+.results{display:grid;gap:14px;margin-top:18px}.restaurant{border-radius:18px;padding:18px;display:grid;grid-template-columns:48px 1fr auto;gap:14px}.rank{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;background:#ccfbf1;color:#115e59;font-weight:900}.restaurant h2{margin:0 0 6px;font-size:20px}.meta{color:var(--muted);font-size:14px;line-height:1.7}.score{text-align:right;white-space:nowrap}.score strong{color:#b45309;font-size:18px}.badge{display:inline-block;margin:8px 5px 0 0;padding:4px 9px;border-radius:999px;background:#f1f5f9;font-size:12px}.maplink{display:inline-block;margin-top:9px;color:var(--brand);font-weight:750}footer{color:var(--muted);font-size:13px;margin-top:22px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.full{grid-column:auto}.restaurant{grid-template-columns:42px 1fr}.score{grid-column:2;text-align:left}.actions{flex-direction:column}.secondary{max-width:none}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<h1>今天中午吃什麼？</h1>
+<p class="sub">支援 Demo Key 與 Places API (New)。依地址、餐點、預算、身體狀態、距離及 Google 評分推薦 5 家。</p>
+<section class="panel">
+<div class="grid">
+<div class="full"><label for="address">所在地址</label><input id="address" placeholder="例：台北市信義區松仁路 100 號" autocomplete="street-address"></div>
+<div><label for="food">想吃的種類</label><select id="food"><option value="">不限</option><option>台灣料理</option><option>健康餐</option><option>日式料理</option><option>韓式料理</option><option>義大利料理</option><option>泰式料理</option><option>越南料理</option><option>素食</option><option>麵食</option><option>便當</option></select></div>
+<div><label for="budget">每人最高預算（新台幣）</label><input id="budget" type="number" min="50" step="50" value="300"></div>
+<div><label for="condition">身體狀態</label><select id="condition"><option value="normal">一般</option><option value="light">想清淡一點</option><option value="cold">感冒或喉嚨不適</option><option value="stomach">腸胃不適</option><option value="fitness">健身或高蛋白</option><option value="vegetarian">吃素</option><option value="lowcarb">低醣需求</option></select></div>
+<div><label for="radius">搜尋距離</label><select id="radius"><option value="800">800 公尺</option><option value="1500" selected>1.5 公里</option><option value="3000">3 公里</option><option value="5000">5 公里</option></select></div>
+<div class="full"><label for="apiKey">Google Maps Demo Key 或正式 API Key</label><input id="apiKey" type="password" placeholder="貼上 API Key" autocomplete="off"></div>
+</div>
+<div class="note">Google Cloud 專案需啟用 Maps JavaScript API 與 Places API (New)。本版不使用 PlacesService、nearbySearch 或其他 Places Legacy 呼叫。</div>
+<div class="actions"><button id="searchBtn" class="primary">推薦 5 家午餐</button><button id="locateBtn" class="secondary">使用目前位置</button></div>
+<p id="status" role="status"></p>
+</section>
+<section id="results" class="results" aria-live="polite"></section>
+<footer>健康條件只用於調整搜尋關鍵字，不是醫療建議。預算屬近似篩選，請以店家實際菜單為準。</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);let currentPosition=null,loadedKey='';
+const healthKeywords={normal:'',light:'清淡 健康',cold:'粥 湯 清淡',stomach:'粥 清淡 易消化',fitness:'高蛋白 健康餐 雞胸',vegetarian:'素食 蔬食',lowcarb:'低醣 生酮 健康餐'};
+function loadGoogleMaps(key){return new Promise((resolve,reject)=>{if(window.google?.maps?.importLibrary&&loadedKey===key)return resolve();if(window.google?.maps&&loadedKey&&loadedKey!==key)return reject(new Error('已載入另一組 API Key，請重新整理頁面後再試。'));const old=$('gmaps-script');if(old)old.remove();window.__gmapsReady=()=>{loadedKey=key;resolve()};const s=document.createElement('script');s.id='gmaps-script';s.async=true;s.defer=true;s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&loading=async&callback=__gmapsReady&v=weekly&language=zh-TW&region=TW`;s.onerror=()=>reject(new Error('Google Maps 載入失敗，請檢查 Demo Key、網域限制與 API 設定。'));document.head.appendChild(s)})}
+function latOf(p){return typeof p.lat==='function'?p.lat():p.lat}function lngOf(p){return typeof p.lng==='function'?p.lng():p.lng}
+function distanceKm(a,b){const R=6371,rad=x=>x*Math.PI/180,dLat=rad(latOf(b)-latOf(a)),dLng=rad(lngOf(b)-lngOf(a));const q=Math.sin(dLat/2)**2+Math.cos(rad(latOf(a)))*Math.cos(rad(latOf(b)))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(q))}
+function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function priceText(level){const m={PRICE_LEVEL_FREE:'免費',PRICE_LEVEL_INEXPENSIVE:'$',PRICE_LEVEL_MODERATE:'$$',PRICE_LEVEL_EXPENSIVE:'$$$',PRICE_LEVEL_VERY_EXPENSIVE:'$$$$'};return m[level]||'價位未提供'}
+function budgetAllows(level,budget){const max=budget<=150?1:budget<=350?2:budget<=700?3:4;const n={PRICE_LEVEL_FREE:0,PRICE_LEVEL_INEXPENSIVE:1,PRICE_LEVEL_MODERATE:2,PRICE_LEVEL_EXPENSIVE:3,PRICE_LEVEL_VERY_EXPENSIVE:4};return n[level]==null||n[level]<=max}
+async function addressToLocation(Place,address){const {places}=await Place.searchByText({textQuery:address,fields:['displayName','formattedAddress','location'],language:'zh-TW',region:'TW',maxResultCount:1});if(!places?.length||!places[0].location)throw new Error('找不到此地址，請輸入更完整的地址。');return places[0].location}
+function render(items){$('results').innerHTML=items.map((x,i)=>{const name=typeof x.place.displayName==='string'?x.place.displayName:(x.place.displayName?.text||'未命名餐廳');const mapUrl=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name+' '+(x.place.formattedAddress||''))}&query_place_id=${encodeURIComponent(x.place.id||'')}`;return `<article class="restaurant"><div class="rank">${i+1}</div><div><h2>${esc(name)}</h2><div class="meta">${esc(x.place.formattedAddress||'地址未提供')}<br>${x.place.businessStatus==='OPERATIONAL'?'正常營業':esc(x.place.businessStatus||'營業狀態未提供')}</div><span class="badge">約 ${x.distance.toFixed(1)} 公里</span><span class="badge">${priceText(x.place.priceLevel)}</span><a class="maplink" target="_blank" rel="noopener" href="${mapUrl}">在 Google 地圖查看</a></div><div class="score"><strong>★ ${Number(x.place.rating||0).toFixed(1)}</strong><div class="meta">${x.place.userRatingCount||0} 則評分<br>推薦分數 ${x.score.toFixed(1)}</div></div></article>`}).join('')}
+async function searchLunch(){const key=$('apiKey').value.trim(),address=$('address').value.trim(),food=$('food').value,budget=Number($('budget').value),radius=Number($('radius').value);if(!key)return $('status').textContent='請輸入 Demo Key 或正式 API Key。';if(!currentPosition&&!address)return $('status').textContent='請輸入地址，或使用目前位置。';$('searchBtn').disabled=true;$('status').textContent='正在使用 Places API (New) 尋找餐廳…';$('results').innerHTML='';try{await loadGoogleMaps(key);const {Place}=await google.maps.importLibrary('places');const origin=currentPosition||await addressToLocation(Place,address);const keyword=[food,healthKeywords[$('condition').value],'午餐 餐廳'].filter(Boolean).join(' ');const request={textQuery:keyword,fields:['id','displayName','formattedAddress','location','rating','userRatingCount','priceLevel','businessStatus'],includedType:'restaurant',useStrictTypeFiltering:false,locationBias:{center:{lat:latOf(origin),lng:lngOf(origin)},radius},language:'zh-TW',region:'TW',maxResultCount:20,minRating:1};const {places}=await Place.searchByText(request);const ranked=(places||[]).filter(p=>p.location&&budgetAllows(p.priceLevel,budget)).map(place=>{const distance=distanceKm(origin,place.location);const rating=Number(place.rating||0),reviews=Number(place.userRatingCount||0);const score=rating*12+Math.log10(reviews+1)*4+Math.max(0,18-distance*7);return{place,distance,score}}).filter(x=>x.distance<=Math.max(radius/1000*1.35,.9)).sort((a,b)=>b.score-a.score).slice(0,5);if(!ranked.length){$('status').textContent='找不到符合條件的餐廳，請提高預算、擴大距離或改選「不限」。';return}render(ranked);$('status').textContent=`已依距離、Google 評分與評分數選出 ${ranked.length} 家建議。`}catch(e){console.error(e);$('status').textContent=`錯誤：${e.message||e}`}finally{$('searchBtn').disabled=false}}
+$('searchBtn').addEventListener('click',searchLunch);$('locateBtn').addEventListener('click',()=>{if(!navigator.geolocation)return $('status').textContent='此瀏覽器不支援定位。';$('status').textContent='正在取得目前位置…';navigator.geolocation.getCurrentPosition(p=>{currentPosition={lat:p.coords.latitude,lng:p.coords.longitude};$('address').value='已使用目前位置';$('status').textContent='已取得目前位置，可以開始搜尋。'},()=>{$('status').textContent='無法取得位置。請允許定位權限，或改用地址。'},{enableHighAccuracy:true,timeout:10000})});
+</script>
+</body>
+</html>
