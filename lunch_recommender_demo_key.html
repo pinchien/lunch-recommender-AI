@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>今天中午吃什麼？</title>
+  <style>
+    :root { --bg:#f6f7fb; --card:#fff; --ink:#17202a; --muted:#667085; --brand:#0f766e; --line:#e5e7eb; --warn:#9a3412; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,"Segoe UI","Noto Sans TC",sans-serif; color:var(--ink); background:linear-gradient(135deg,#ecfdf5,#f8fafc 45%,#eff6ff); }
+    .wrap { width:min(1080px,92%); margin:40px auto; }
+    header { margin-bottom:20px; }
+    h1 { margin:0 0 8px; font-size:clamp(28px,5vw,44px); }
+    .sub { color:var(--muted); margin:0; }
+    .panel { background:rgba(255,255,255,.94); border:1px solid rgba(255,255,255,.7); border-radius:22px; padding:22px; box-shadow:0 18px 50px rgba(15,23,42,.08); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    label { display:block; font-weight:700; margin-bottom:7px; }
+    input,select,button { width:100%; min-height:46px; border-radius:12px; font:inherit; }
+    input,select { border:1px solid var(--line); padding:0 13px; background:#fff; }
+    input:focus,select:focus { outline:3px solid #99f6e4; border-color:var(--brand); }
+    .full { grid-column:1/-1; }
+    .api { margin-top:14px; padding:12px; border-radius:12px; background:#fff7ed; color:var(--warn); font-size:14px; }
+    .actions { display:flex; gap:10px; margin-top:18px; }
+    button { border:0; cursor:pointer; padding:0 18px; font-weight:800; }
+    .primary { color:#fff; background:var(--brand); }
+    .secondary { background:#eef2f6; color:#344054; max-width:180px; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    #status { min-height:24px; margin:16px 0 0; color:var(--muted); }
+    .results { display:grid; gap:14px; margin-top:18px; }
+    .restaurant { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:18px; display:grid; grid-template-columns:48px 1fr auto; gap:14px; align-items:start; }
+    .rank { width:42px; height:42px; display:grid; place-items:center; border-radius:50%; background:#ccfbf1; color:#115e59; font-weight:900; }
+    .restaurant h2 { margin:0 0 6px; font-size:20px; }
+    .meta { color:var(--muted); font-size:14px; line-height:1.7; }
+    .score { text-align:right; white-space:nowrap; }
+    .score strong { color:#b45309; font-size:18px; }
+    .badge { display:inline-block; margin:8px 5px 0 0; padding:4px 9px; border-radius:999px; background:#f1f5f9; font-size:12px; }
+    .maplink { display:inline-block; margin-top:9px; color:var(--brand); font-weight:700; }
+    footer { color:var(--muted); font-size:13px; margin-top:22px; }
+    @media(max-width:700px){ .grid{grid-template-columns:1fr}.full{grid-column:auto}.restaurant{grid-template-columns:42px 1fr}.score{grid-column:2;text-align:left}.actions{flex-direction:column}.secondary{max-width:none} }
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header><h1>今天中午吃什麼？</h1><p class="sub">依地址、餐點種類、預算與身體狀態，綜合距離及 Google 評分推薦 5 家餐廳。</p></header>
+  <section class="panel" aria-label="午餐條件">
+    <div class="grid">
+      <div class="full"><label for="address">所在地址</label><input id="address" placeholder="例：台北市信義區松仁路 100 號" autocomplete="street-address"></div>
+      <div><label for="food">想吃的種類</label><select id="food"><option value="">不限</option><option>台灣料理</option><option>健康餐</option><option>日式料理</option><option>韓式料理</option><option>義大利料理</option><option>泰式料理</option><option>越南料理</option><option>素食</option><option>麵食</option><option>便當</option></select></div>
+      <div><label for="temperature">想吃熱的或冷的</label><select id="temperature"><option value="">不限</option><option value="hot">熱的</option><option value="cold">冷的</option></select></div>
+      <div><label for="budget">每人最高預算（新台幣）</label><input id="budget" type="number" min="50" step="50" value="300"></div>
+      <div><label for="condition">身體狀態</label><select id="condition"><option value="normal">一般</option><option value="light">想清淡一點</option><option value="cold">感冒或喉嚨不適</option><option value="stomach">腸胃不適</option><option value="fitness">健身或高蛋白</option><option value="vegetarian">吃素</option><option value="lowcarb">低醣需求</option></select></div>
+      <div><label for="radius">搜尋距離</label><select id="radius"><option value="400">400 公尺</option><option value="800">800 公尺</option><option value="1500" selected>1.5 公里</option><option value="3000">3 公里</option></select></div>
+      <div class="full"><label for="apiKey">Google Maps API 金鑰（可使用 Demo Key）</label><input id="apiKey" type="password" placeholder="貼上 Google Maps Demo Key 或正式 API Key"></div>
+    </div>
+    <div class="full" style="margin-top:10px;color:#667085;font-size:13px">輸入地址時會顯示 Google 地址建議，請直接點選建議地址，可降低地址解析失敗。</div><div id="mapHost" style="display:none"></div><div class="api">此版本支援 Google Maps Demo Key，並使用 Places API (New) 的 Place.searchNearby。Demo Key 僅適合測試與原型；正式上線請改用正式 API Key。</div><div class="api">注意：Demo Key 無法取得 Google 使用者原創內容，例如評論；Google 評分等欄位若未回傳，推薦會主要依距離等可取得資料排序。</div>
+    <div class="actions"><button class="primary" id="searchBtn">推薦 5 家午餐</button><button class="secondary" id="locateBtn">使用目前位置</button></div>
+    <p id="status" role="status"></p>
+  </section>
+  <section id="results" class="results" aria-live="polite"></section>
+  <footer>健康狀態只用於調整搜尋關鍵字，不是醫療建議。價格為 Google 的價位等級估算，請以店家現場資訊為準。</footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let currentPosition = null;
+let selectedPlace = null;
+let autocompleteReady = false;
+const temperatureKeywords = {hot:'熱食 熱湯 熟食', cold:'冷食 涼麵 沙拉'};
+const healthKeywords = {
+  normal:'', light:'清淡 健康', cold:'粥 湯 清淡', stomach:'粥 清淡 易消化',
+  fitness:'高蛋白 健康餐 雞胸', vegetarian:'素食 蔬食', lowcarb:'低醣 生酮 健康餐'
+};
+const priceCaps = [[150,1],[350,2],[700,3],[Infinity,4]];
+const budgetLevel = n => priceCaps.find(([cap]) => n <= cap)[1];
+function loadGoogle(key){
+  return new Promise((resolve,reject)=>{
+    if(window.google?.maps?.places){ initAutocomplete(); return resolve(); }
+    const old=$('gmaps-script'); if(old) old.remove();
+    const s=document.createElement('script'); s.id='gmaps-script';
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&language=zh-TW&region=TW&v=weekly`;
+    s.async=true; s.defer=true; s.onload=()=>{ initAutocomplete(); resolve(); }; s.onerror=()=>reject(new Error('Google Maps 載入失敗，請檢查 API 金鑰及 API 設定。'));
+    document.head.appendChild(s);
+  });
+}
+
+function initAutocomplete(){
+  if(autocompleteReady || !window.google?.maps?.places) return;
+  const input=$('address');
+  const ac=new google.maps.places.Autocomplete(input,{componentRestrictions:{country:'tw'},fields:['formatted_address','geometry','name'],types:['geocode']});
+  ac.addListener('place_changed',()=>{
+    const place=ac.getPlace();
+    if(place.geometry?.location){
+      selectedPlace=place;
+      currentPosition=null;
+      $('address').value=place.formatted_address || input.value;
+      $('status').textContent='已選擇 Google 地址，可以開始搜尋。';
+    }
+  });
+  input.addEventListener('input',()=>{ selectedPlace=null; currentPosition=null; });
+  autocompleteReady=true;
+}
+
+function geocode(address){
+  return new Promise((resolve,reject)=>new google.maps.Geocoder().geocode({address: address + ', Taiwan', region:'TW', componentRestrictions:{country:'TW'}},(r,s)=>s==='OK'&&r[0]?resolve(r[0].geometry.location):reject(new Error('Google 無法解析此地址。請嘗試只輸入「新北市板橋區縣民大道二段68號」，不要加入樓層；或改用目前位置。'))));
+}
+async function nearbyNew(origin, radius){
+  const { Place, SearchNearbyRankPreference } = await google.maps.importLibrary('places');
+  const request = {
+    fields: ['displayName','location','formattedAddress','rating','userRatingCount','priceLevel','businessStatus','googleMapsURI'],
+    locationRestriction: { center: origin, radius: Math.min(radius, 50000) },
+    includedPrimaryTypes: ['restaurant'],
+    maxResultCount: 20,
+    rankPreference: SearchNearbyRankPreference.POPULARITY,
+    language: 'zh-TW',
+    region: 'TW'
+  };
+  const { places } = await Place.searchNearby(request);
+  return places || [];
+}
+function distanceKm(a,b){
+  const R=6371, rad=x=>x*Math.PI/180, dLat=rad(b.lat()-a.lat()), dLng=rad(b.lng()-a.lng());
+  const q=Math.sin(dLat/2)**2+Math.cos(rad(a.lat()))*Math.cos(rad(b.lat()))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(q));
+}
+function esc(s=''){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function render(items){
+  $('results').innerHTML=items.map((x,i)=>`<article class="restaurant"><div class="rank">${i+1}</div><div><h2>${esc(x.name)}</h2><div class="meta">${esc(x.vicinity||'地址未提供')}<br>${x.businessStatus==='OPERATIONAL'?'營業中':'營業狀態：'+(x.businessStatus||'未提供')}</div><span class="badge">約 ${x.distance.toFixed(1)} 公里</span><span class="badge">${x.price_level===null?'價位未提供':'$'.repeat(Math.max(1,x.price_level))+' 價位'}</span><a class="maplink" target="_blank" rel="noopener" href="${x.googleMapsURI || ('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(x.name+' '+(x.vicinity||'')))}">在 Google 地圖查看</a></div><div class="score"><strong>★ ${x.rating?.toFixed(1)||'無評分'}</strong><div class="meta">${x.user_ratings_total||0} 則評論<br>推薦分數 ${x.score.toFixed(1)}</div></div></article>`).join('');
+}
+async function searchLunch(){
+  const key=$('apiKey').value.trim(), address=$('address').value.trim(), food=$('food').value, budget=Number($('budget').value), radius=Number($('radius').value);
+  if(!key) return $('status').textContent='請先輸入 Google Maps API 金鑰（可使用 Demo Key）。';
+  if(!currentPosition && !address) return $('status').textContent='請輸入地址，或使用目前位置。';
+  $('searchBtn').disabled=true; $('status').textContent='正在尋找附近適合的餐廳…'; $('results').innerHTML='';
+  try{
+    await loadGoogle(key);
+    const origin=currentPosition ? new google.maps.LatLng(currentPosition.lat,currentPosition.lng) : selectedPlace?.geometry?.location ? selectedPlace.geometry.location : await geocode(address.replace(/\d+樓.*$/,'').trim());
+    const map=document.createElement('div');
+    const keyword=[food,temperatureKeywords[$('temperature').value],healthKeywords[$('condition').value],'午餐 餐廳'].filter(Boolean).join(' ');
+    const list=await nearbyNew(origin,radius);
+    const levelMap={PRICE_LEVEL_FREE:0,PRICE_LEVEL_INEXPENSIVE:1,PRICE_LEVEL_MODERATE:2,PRICE_LEVEL_EXPENSIVE:3,PRICE_LEVEL_VERY_EXPENSIVE:4};
+    const ranked=list.filter(x=>x.location).map(x=>{
+      const d=distanceKm(origin,x.location), rating=x.rating||0, reviews=x.userRatingCount||0;
+      const level=levelMap[x.priceLevel] ?? null;
+      const score=rating*12 + Math.log10(reviews+1)*4 + Math.max(0,18-d*7);
+      return {
+        name:x.displayName||'未命名餐廳', vicinity:x.formattedAddress||'', rating, user_ratings_total:reviews,
+        price_level:level, location:x.location, place_id:x.id||'', googleMapsURI:x.googleMapsURI||'',
+        distance:d, score, businessStatus:x.businessStatus||''
+      };
+    }).filter(x=>x.price_level===null || x.price_level<=budgetLevel(budget))
+      .sort((a,b)=>b.score-a.score).slice(0,5);
+    if(!ranked.length){ $('status').textContent='在目前條件下找不到餐廳，請提高預算、擴大距離或改選「不限」。'; return; }
+    render(ranked); $('status').textContent=`已依距離、Google 評分與評論數選出 ${ranked.length} 家建議。`;
+  }catch(e){ $('status').textContent=e.message; }
+  finally{$('searchBtn').disabled=false;}
+}
+$('searchBtn').addEventListener('click',searchLunch);
+$('apiKey').addEventListener('change', async()=>{ const key=$('apiKey').value.trim(); if(key){ try{ await loadGoogle(key); $('status').textContent='Google 地址建議已啟用，請輸入地址並從建議清單選擇。'; }catch(e){ $('status').textContent=e.message; } } });
+$('locateBtn').addEventListener('click',()=>{
+  if(!navigator.geolocation) return $('status').textContent='此瀏覽器不支援定位。';
+  $('status').textContent='正在取得目前位置…';
+  navigator.geolocation.getCurrentPosition(p=>{currentPosition={lat:p.coords.latitude,lng:p.coords.longitude};$('address').value='已使用目前位置';$('status').textContent='已取得目前位置，可以開始搜尋。';},()=>{$('status').textContent='無法取得位置，請允許定位權限或改輸入地址。';},{enableHighAccuracy:true,timeout:10000});
+});
+</script>
+</body>
+</html>
